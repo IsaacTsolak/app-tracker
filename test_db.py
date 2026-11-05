@@ -16,7 +16,7 @@ harper_id = add_application(Application(
     last_activity=date.today() - timedelta(days=3),
 ))
 
-update_status(harper_id, Status.INTERVIEWING)
+update_status(harper_id, Status.INTERVIEWING, date.today())
 
 for app in get_all():
     print(app.id, app.company, app.status.value, f"{app.days_since_activity()} days since activity")
@@ -25,3 +25,10 @@ try:
     update_status(999, Status.OFFER)
 except Exception as e:
     print("Caught expected error:", e)
+
+from db import is_processed, mark_processed, find_by_company
+
+mark_processed("test-email-1", "applied", "Thank you for applying to Coach")
+print("Processed?", is_processed("test-email-1"), is_processed("never-seen"))
+print("Found:", find_by_company("  coach "))
+    

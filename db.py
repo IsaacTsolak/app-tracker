@@ -50,6 +50,16 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS processed_emails (
+                email_id TEXT PRIMARY KEY,
+                processed_at TEXT,
+                outcome TEXT,
+                subject TEXT
+            )
+            """
+        )
 
 
 def add_application(app: Application) -> int:
@@ -84,7 +94,7 @@ def get_all() -> list[Application]:
     return [_row_to_application(row) for row in rows]
 
 
-def update_status(app_id: int, new_status: Status) -> None:
+def update_status(app_id: int, new_status: Status, activity_date: date) -> None:
     with _connect() as conn:
         cursor = conn.execute(
             """
@@ -92,7 +102,49 @@ def update_status(app_id: int, new_status: Status) -> None:
             SET status = ?, last_activity = ?
             WHERE id = ?
             """,
-            (new_status.value, date.today().isoformat(), app_id),
+            (new_status.value, activity_date.isoformat(), app_id),
         )
         if cursor.rowcount == 0:
             raise ValueError(f"No application with id {app_id}")
+
+
+def is_processed(email_id: str) -> bool:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM processed_emails WHERE email_id = ?",
+            (email_id,),
+        ).fetchone()
+    return row is not None
+
+
+def mark_processed(email_id: str, outcome: str, subject: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO processed_emails (email_id, processed_at, outcome, subject)
+            VALUES (?, ?, ?, ?)
+            """,
+            (email_id, date.today().isoformat(), outcome, subject),
+        )
+
+
+def find_by_company(company: str) -> Application | None:
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM applications
+            WHERE LOWER(TRIM(company)) = LOWER(TRIM(?))
+            ORDER BY last_activity DESC
+            LIMIT 1
+            """,
+            (company,),
+        ).fetchone()
+    return _row_to_application(row) if row else None
+
+
+def get_review_emails() -> list[sqlite3.Row]:
+    with _connect() as conn:
+        return conn.execute(
+            "SELECT * FROM processed_emails WHERE outcome = ?",
+            ("review",),
+        ).fetchall()
