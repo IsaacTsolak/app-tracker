@@ -22,8 +22,8 @@ for app in get_all():
     print(app.id, app.company, app.status.value, f"{app.days_since_activity()} days since activity")
 
 try:
-    update_status(999, Status.OFFER)
-except Exception as e:
+    update_status(999, Status.OFFER, date.today())
+except ValueError as e:
     print("Caught expected error:", e)
 
 from db import is_processed, mark_processed, find_by_company

@@ -38,7 +38,9 @@ REVIEW_SUBJECT_KEYWORDS = [
 INTERVIEW_PHRASES = [
     "schedule an interview",
     "schedule a call",
-    "availability",
+    "invite you to interview",
+    "like to interview you",
+    "interview with our team",
     "speak with you",
     "next round",
 ]
@@ -52,6 +54,12 @@ ASSESSMENT_PHRASES = [
 ]
 APPLIED_PHRASES = [
     "thank you for applying",
+    "thank you for your application",
+    "thanks for applying",
+    "thanks for your application",
+    "application received",
+    "has been submitted",
+    "application sent",
     "application was sent",
     "received your application",
     "your application for",
@@ -60,9 +68,13 @@ APPLIED_PHRASES = [
 # Up to 4 words; stop at ! . , : ; or a dash.
 _COMPANY_CAPTURE = r"([^\s!.,:;\-]+(?:\s+[^\s!.,:;\-]+){0,3})"
 COMPANY_PATTERNS = [
+    rf"application to .+ at {_COMPANY_CAPTURE}",
+    rf"submitted for {_COMPANY_CAPTURE}",
     rf"applying to {_COMPANY_CAPTURE}",
     rf"application was sent to {_COMPANY_CAPTURE}",
+    r"application to (.+?) on Poached",
     rf"application to {_COMPANY_CAPTURE}",
+    rf"thank you from {_COMPANY_CAPTURE}",
     rf"interest in {_COMPANY_CAPTURE}",
     rf"position at {_COMPANY_CAPTURE}",
 ]
@@ -86,6 +98,12 @@ ATS_DOMAINS = [
     "ashby",
     "linkedin",
     "smartrecruiters",
+    "coderbyte",
+    "hackerrank",
+    "codesignal",
+    "icims",
+    "apply4me",
+    "ladders",
 ]
 
 
@@ -143,12 +161,18 @@ ROLE_WORDS = ("engineer", "scientist", "developer", "analyst", "manager",
 
 
 def _clean_company(name: str) -> str | None:
-    cleaned = re.sub(r"\([^)]*\)", "", name)
+    cleaned = re.sub(r" @ .*", "", name, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\([^)]*\)", "", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     cleaned = cleaned.rstrip(".,;:!?-").strip()
     if not cleaned:
         return None
     lowered = cleaned.lower()
+    first = lowered.split()[0]
+    if first in ("working", "joining", "us", "our"):
+        return None
+    if any(re.search(rf"\b{re.escape(ats)}\b", lowered) for ats in ATS_DOMAINS):
+        return None
     # Things like "the Associate Data Scientist" are roles, not companies
     if lowered.startswith("the "):
         return None
@@ -175,7 +199,14 @@ def extract_company(email: dict) -> str | None:
 
 
 def extract_role(email: dict) -> str | None:
-    return _first_match(ROLE_PATTERNS, _text(email))
+    role = _first_match(ROLE_PATTERNS, _text(email))
+    if not role:
+        return None
+    role = re.sub(r"\s+", " ", role).strip()
+    # Reject sentence fragments like "role. If you are not selected for this"
+    if len(role.split()) > 6 or any(ch in role for ch in ".!?:;"):
+        return None
+    return role
 
 
 def _match_phrase(text: str, phrases: list[str]) -> str | None:

@@ -34,7 +34,12 @@ def _print_line(outcome: str, company: str | None, status: Status | None, subjec
     print(f"{outcome:10} | {company or '':20} | {status_label:12} | {subject}")
 
 
-def sync(days: int = 30, max_results: int = 100, dry_run: bool = False) -> None:
+def sync(
+    days: int = 30,
+    max_results: int = 100,
+    dry_run: bool = False,
+    verbose: bool = True,
+) -> None:
     init_db()
     emails = fetch_job_emails(days=days, max_results=max_results)
     emails.sort(key=lambda email: email["date"])
@@ -42,6 +47,7 @@ def sync(days: int = 30, max_results: int = 100, dry_run: bool = False) -> None:
     counts: Counter[str] = Counter()
     for email in emails:
         if is_processed(email["id"]):
+            counts["skipped"] += 1
             continue
 
         result = classify(email)
@@ -79,9 +85,11 @@ def sync(days: int = 30, max_results: int = 100, dry_run: bool = False) -> None:
             mark_processed(email["id"], outcome, subject)
 
         counts[outcome] += 1
-        _print_line(outcome, company, status, subject)
+        if verbose:
+            _print_line(outcome, company, status, subject)
 
-    print()
+    if verbose:
+        print()
     for outcome, count in counts.most_common():
         print(f"{outcome}: {count}")
 
